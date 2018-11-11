@@ -3,6 +3,7 @@ package com.alaphi.producer
 import scala.concurrent.Await
 import scala.concurrent.duration._
 import monix.execution.Scheduler
+import monix.eval.Task
 import monix.kafka.{KafkaProducer, KafkaProducerConfig}
 
 
@@ -16,9 +17,11 @@ object HelloProducer extends App {
   val producer = KafkaProducer[String,String](producerCfg, scheduler)
 
   val publish = for {
-    _ <- producer.send("hellotopic", "Hello there").delayExecution(20 seconds)
+    _ <- Task.sequence(
+      for (n <- 1 to 1000) yield producer.send("hellotopic", s"Hello there: $n")
+    )
     close <- producer.close()
   } yield close
 
-  val result = Await.result(publish.runAsync, Duration.Inf)
+  val result = Await.result(publish.delayExecution(20 seconds).runAsync, Duration.Inf)
 }
