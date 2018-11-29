@@ -23,5 +23,5 @@ object HelloProducer extends App {
     close <- producer.close()
   } yield close
 
-  val result = Await.result(publish.delayExecution(20 seconds).runAsync, Duration.Inf)
+  val result = Await.result(publish.delayExecution(10 seconds).runAsync, Duration.Inf)
 }

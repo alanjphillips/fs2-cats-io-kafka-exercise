@@ -11,6 +11,7 @@ import scala.collection.JavaConverters._
 
 
 object Consume extends App {
+
   import MessageStreamer._
 
   type Message = String
@@ -30,13 +31,17 @@ object Consume extends App {
     .as(ExitCode.Success)
 
   resultStream.unsafeRunSync()
+
 }
+
 
 object MessageStreamer {
 
   def messages[F[_]](h: KafkaHandle[F])(implicit F: ConcurrentEffect[F], cs: ContextShift[F]): Stream[F,Message] =
     Stream.eval_(h.subscribe) ++ h.pollStream
+
 }
+
 
 trait KafkaHandle[F[_]] {
 
@@ -47,15 +52,22 @@ trait KafkaHandle[F[_]] {
   }
 
   def poll(implicit F: ConcurrentEffect[F]): F[ConsumerRecords[String, String]] = F.delay {
-    consumer.poll(1000)
+    consumer.poll(Long.MaxValue)
   }
 
   def pollStream(implicit F: ConcurrentEffect[F]): Stream[F, String] =
     Stream.repeatEval(poll)
       .filter(_.count > 0)
-      .flatMap(consumerRecords => Stream.emits(consumerRecords.iterator.asScala.toSeq.map(_.value)))
+      .flatMap { consumerRecords =>
+        Stream.emits {
+          val records = consumerRecords.iterator.asScala.toSeq
+          IO(println(s"Records pulled: ${records.size}")).unsafeRunSync()
+          records.map(_.value)
+        }
+      }
 
 }
+
 
 object KafkaHandle {
 
@@ -74,4 +86,5 @@ object KafkaHandle {
   def apply[F[_]]()(implicit F: ConcurrentEffect[F]): KafkaHandle[F] = new KafkaHandle[F] {
     override val consumer = new KafkaConsumer[String, String](props)
   }
+
 }
